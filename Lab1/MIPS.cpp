@@ -153,7 +153,7 @@ class INSMem
        * and return the read result. 
        */
 
-      int byteIdx = ReadAddress.to_ullong()/8;  // Give the byte index of the intrsudction
+      int byteIdx = ReadAddress.to_ulong();  // Give the byte index of the intrsudction
 
       // Concat the current 8 bits (at byteIdx) and the consecutive 26 bits (3 bytes) to get the instruction
       string bitsetInstStr = "";
@@ -201,17 +201,18 @@ class DataMem
        *
        * This function is used to read/write data from/to the DataMem, depending on the readmem and writemem.
        * First, if writemem enabled, WriteData should be written to DMem, clear or ignore the return value readdata,
-       * and note that 32-bit WriteData will occupy 4 continious Bytes in DMem. 
+       * and note that 32-bit - will occupy 4 continious Bytes in DMem. 
        * If readmem enabled, return the DMem read result as readdata.
        */
       // TODO: implement!
-      int addIdx = Address.to_ulong()/8;
+
+      int addIdx = Address.to_ulong();
       if (readmem.any())
       {
         string bitsetInstStr = "";
         for (int i = addIdx; i < addIdx + 3; i++)
         {
-            bitsetInstStr += DMem[addIdx].to_string();
+            bitsetInstStr += DMem[addIdx + i].to_string();
         }
 
         return readdata = bitset<32>(bitsetInstStr);
@@ -264,11 +265,16 @@ int main()
   INSMem myInsMem;
   DataMem myDataMem;
 
+  bitset<32> PC;
+
   while (1)  // TODO: implement!
   {
     // Fetch: fetch an instruction from myInsMem.
+    bitset<32> instruction = myInsMem.ReadMemory(PC);
 
     // If current instruction is "11111111111111111111111111111111", then break; (exit the while loop)
+    if (instruction.all())
+      break;
 
     // decode(Read RF): get opcode and other signals from instruction, decode instruction
 
@@ -277,9 +283,10 @@ int main()
     // Read/Write Mem: access data memory (myDataMem)
 
     // Write back to RF: some operations may write things to RF
-
-
-
+    
+    
+    // Update program counter by 4
+    PC = PC.to_ulong() + 4;
     /**** You don't need to modify the following lines. ****/
     myRF.OutputRF(); // dump RF;    
   }

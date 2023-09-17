@@ -205,6 +205,31 @@ class DataMem
        * If readmem enabled, return the DMem read result as readdata.
        */
       // TODO: implement!
+      int addIdx = Address.to_ulong()/8;
+      if (readmem.any())
+      {
+        string bitsetInstStr = "";
+        for (int i = addIdx; i < addIdx + 3; i++)
+        {
+            bitsetInstStr += DMem[addIdx].to_string();
+        }
+
+        return readdata = bitset<32>(bitsetInstStr);
+      }
+
+      if (writemem.any())
+      {
+        // Clear the read data when write is enabled
+        readdata.reset();
+
+        // Extract each byte out from the 32 bit data and write to DMemory
+        for (int i = 0; i < 4; i++)
+        {
+          string byteStr = (WriteData >> (3-i)*8).to_string().substr(24, 8);
+          DMem[addIdx + i] = bitset<8>(byteStr);
+        }
+      }
+
       return readdata;     
     }   
 

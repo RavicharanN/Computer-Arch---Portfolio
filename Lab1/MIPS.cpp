@@ -98,15 +98,15 @@ class ALU
           break;
 
         case AND:
-          ALUresult = bitset<32>(oprand1 & oprand2);
+          ALUresult = oprand1 & oprand2;
           break;
 
         case OR:
-          ALUresult = bitset<32>(oprand1 | oprand2);
+          ALUresult = oprand1 | oprand2;
           break;
 
         case NOR:
-          ALUresult = bitset<32>(~((oprand1 | oprand2)));
+          ALUresult = ~(oprand1 | oprand2);
           break;
 
         default:

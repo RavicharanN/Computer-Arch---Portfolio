@@ -288,29 +288,36 @@ int main()
     // Write back to RF: some operations may write things to RF
 
     // R-Type instruction : opcode is zero for all bits
+    bitset<3> aluOp = bitset<3>(instruction.to_string().substr(0, 3));
     if (!opcode.any())
     {
       bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));   // op1 
-      bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));   // op2
-      bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(16, 5));   // rd <- rs + rt
+      bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));  // op2
+      bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(16, 5));  // rd <- rs + rt
 
-      myRF.ReadWrite(rsAddress, rtAddress, rdAddress, 0, 0);            // Get the values at rs & rt for computation 
+      myRF.ReadWrite(rsAddress, rtAddress, rdAddress, 0, 0);                    // Get the values at rs & rt for computation 
       bitset<32> reg1 = myRF.ReadData1;
-      bitset<32> reg2 = myRF.ReadData2;                                 // Feed these values to ALU
+      bitset<32> reg2 = myRF.ReadData2;                                         // Feed these values to ALU
       
-      myALU.ALUOperation(bitset<3>(instruction.to_string().substr(0, 3)), reg1, reg2);
+      myALU.ALUOperation(aluOp, reg1, reg2);
       bitset<32> writeData = myALU.ALUresult;
-      myRF.ReadWrite(rsAddress, rtAddress, rdAddress, writeData, 1);    // Carry out the ALU operation and feed the res to RF
+      myRF.ReadWrite(rsAddress, 0, rdAddress, writeData, 1);                    // Carry out the ALU operation and feed the res to RF
     }
-    else if (opcode != 00010 || opcode != 00011)                        // Not R and not J => I Type
+    else if (opcode != 00010 || opcode != 00011)                                    // Not R and not J => I Type
     {
-      bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));   // op1 
-      bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));  // This becomes the write for I type
+      bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));       // op1 
+      bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));      // This becomes the write for I type
 
+      myRF.ReadWrite(rsAddress, rtAddress, rtAddress, 0, 0);
+      bitset<32> op1 = myRF.ReadData1;                                              // RS is the first operand for I Type
+      bitset<16> immediate = bitset<16>(instruction.to_string().substr(16, 16));
+      bitset<32> signExtImmediate = bitset<32>(immediate.to_ulong() & 0xFFFFFFFF);  // Sign extend immediate is used as the second op for I Type
+
+      myALU.ALUOperation(aluOp, op1, signExtImmediate);
+      myRF.ReadWrite(rsAddress, 0, rtAddress, myALU.ALUresult, 1);                  // Write as rt <- rs + signExtImm
     }
     
-    // Update program counter by 4
-    PC = PC.to_ulong() + 4;
+    PC = PC.to_ulong() + 4;                                                     // Update program counter by 4
 
     /**** You don't need to modify the following lines. ****/
     myRF.OutputRF(); // dump RF;    

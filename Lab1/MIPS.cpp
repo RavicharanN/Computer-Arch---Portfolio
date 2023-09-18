@@ -41,6 +41,8 @@ class RF
       int rdRegIdx2 =  RdReg2.to_ulong();  // Index of read register 2 in the 32 registerArr
       int wrtRegIdx =  WrtReg.to_ulong();  // Index of write register
 
+      ReadData1 = Registers[rdRegIdx1];
+      ReadData2 = Registers[rdRegIdx2];
       // If write enable is set, writeData to the writeRegister
       if (WrtEnable.all())
       {
@@ -271,6 +273,7 @@ int main()
   {
     // Fetch: fetch an instruction from myInsMem.
     bitset<32> instruction = myInsMem.ReadMemory(PC);
+    bitset<5> opcode = bitset<5>(instruction.to_string().substr(26, 6));
 
     // If current instruction is "11111111111111111111111111111111", then break; (exit the while loop)
     if (instruction.all())
@@ -284,9 +287,26 @@ int main()
 
     // Write back to RF: some operations may write things to RF
     
+
+    // R-Type instruction : opcode is zero for all bits
+    if (!opcode.all())
+    {
+      bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(21, 5));   // op1 
+      bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(16, 5));   // op2
+      bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(11, 5));   // rd <- rs + rt
+
+      myRF.ReadWrite(rsAddress, rtAddress, rdAddress, 0, 0);            // Get the values at rs & rt for computation 
+      bitset<32> reg1 = myRF.ReadData1;
+      bitset<32> reg2 = myRF.ReadData2;                                 // Feed these values to ALU
+      
+      myALU.ALUOperation(bitset<3>(instruction.to_string().substr(0, 3)), reg1, reg2);
+      bitset<32> writeData = myALU.ALUresult;
+      myRF.ReadWrite(rsAddress, rtAddress, rdAddress, writeData, 1);    // Carry out the ALU operation and feed the res to RF
+    }
     
     // Update program counter by 4
     PC = PC.to_ulong() + 4;
+
     /**** You don't need to modify the following lines. ****/
     myRF.OutputRF(); // dump RF;    
   }

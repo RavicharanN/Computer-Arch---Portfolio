@@ -273,7 +273,7 @@ int main()
   {
     // Fetch: fetch an instruction from myInsMem.
     bitset<32> instruction = myInsMem.ReadMemory(PC);
-    bitset<5> opcode = bitset<5>(instruction.to_string().substr(26, 6));
+    bitset<5> opcode = bitset<5>(instruction.to_string().substr(0, 6));
 
     // If current instruction is "11111111111111111111111111111111", then break; (exit the while loop)
     if (instruction.all())
@@ -286,14 +286,13 @@ int main()
     // Read/Write Mem: access data memory (myDataMem)
 
     // Write back to RF: some operations may write things to RF
-    
 
     // R-Type instruction : opcode is zero for all bits
-    if (!opcode.all())
+    if (!opcode.any())
     {
-      bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(21, 5));   // op1 
-      bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(16, 5));   // op2
-      bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(11, 5));   // rd <- rs + rt
+      bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));   // op1 
+      bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));   // op2
+      bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(16, 5));   // rd <- rs + rt
 
       myRF.ReadWrite(rsAddress, rtAddress, rdAddress, 0, 0);            // Get the values at rs & rt for computation 
       bitset<32> reg1 = myRF.ReadData1;
@@ -302,6 +301,12 @@ int main()
       myALU.ALUOperation(bitset<3>(instruction.to_string().substr(0, 3)), reg1, reg2);
       bitset<32> writeData = myALU.ALUresult;
       myRF.ReadWrite(rsAddress, rtAddress, rdAddress, writeData, 1);    // Carry out the ALU operation and feed the res to RF
+    }
+    else if (opcode != 00010 || opcode != 00011)                        // Not R and not J => I Type
+    {
+      bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));   // op1 
+      bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));  // This becomes the write for I type
+
     }
     
     // Update program counter by 4

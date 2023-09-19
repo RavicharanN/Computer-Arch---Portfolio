@@ -274,6 +274,7 @@ int main()
     // Fetch: fetch an instruction from myInsMem.
     bitset<32> instruction = myInsMem.ReadMemory(PC);
     bitset<5> opcode = bitset<5>(instruction.to_string().substr(0, 6));
+    bool dontUpdatePC = false; // Set to true for branches and jumps
 
     // If current instruction is "11111111111111111111111111111111", then break; (exit the while loop)
     if (instruction.all())
@@ -287,13 +288,12 @@ int main()
 
     // Write back to RF: some operations may write things to RF
 
-    // R-Type instruction : opcode is zero for all bits
-    bitset<3> aluOp = bitset<3>(instruction.to_string().substr(0, 3));
-    if (!opcode.any())
+    if (!opcode.any())                            // R Type
     {
       bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));   // op1 
       bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));  // op2
       bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(16, 5));  // rd <- rs + rt
+      bitset<3> aluOp = bitset<3>(instruction.to_string().substr(29, 3));
 
       myRF.ReadWrite(rsAddress, rtAddress, rdAddress, 0, 0);                    // Get the values at rs & rt for computation 
       bitset<32> reg1 = myRF.ReadData1;
@@ -303,21 +303,60 @@ int main()
       bitset<32> writeData = myALU.ALUresult;
       myRF.ReadWrite(rsAddress, 0, rdAddress, writeData, 1);                    // Carry out the ALU operation and feed the res to RF
     }
-    else if (opcode != 00010 || opcode != 00011)                                    // Not R and not J => I Type
+    else if (opcode == 00010 || opcode == 00011)  // J Type
+    {
+      // (TODO: Statement Added by Ravi)
+    }
+    else if (opcode != 00010 && opcode != 00011)  // I Type <- not R and not J                                  
     {
       bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));       // op1 
       bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));      // This becomes the write for I type
-
-      myRF.ReadWrite(rsAddress, rtAddress, rtAddress, 0, 0);
-      bitset<32> op1 = myRF.ReadData1;                                              // RS is the first operand for I Type
       bitset<16> immediate = bitset<16>(instruction.to_string().substr(16, 16));
       bitset<32> signExtImmediate = bitset<32>(immediate.to_ulong() & 0xFFFFFFFF);  // Sign extend immediate is used as the second op for I Type
+      
+      myRF.ReadWrite(rsAddress, 0, rtAddress, 0, 0);
+      bitset<32> op1 = myRF.ReadData1;                                              // op1 here is rs
+      bitset<32> op2 = myRF.ReadData2;
 
-      myALU.ALUOperation(aluOp, op1, signExtImmediate);
-      myRF.ReadWrite(rsAddress, 0, rtAddress, myALU.ALUresult, 1);                  // Write as rt <- rs + signExtImm
+      switch (opcode.to_ulong())
+      {
+        case 9: // 001001 addiu
+          myRF.ReadWrite(rsAddress, 0, 0, 0, 0);
+          bitset<32> op1 = myRF.ReadData1;                                          // RS is the first operand for I Type
+          myALU.ALUOperation(ADDU, op1, signExtImmediate);
+          myRF.ReadWrite(rsAddress, 0, rtAddress, myALU.ALUresult, 1);              // Write as R[rt] <- R[rs] + signExtImm
+          break;
+
+        case 35: // 100011 lw
+          bitset<32> memoryAddress = bitset<32>(op1.to_ulong() + signExtImmediate.to_ulong());
+          myDataMem.MemoryAccess(memoryAddress, 0, 1, 0);                           // M[R[rs] + signExtImmediate] 
+          myRF.ReadWrite(0, 0, rtAddress, myDataMem.readdata, 1);                   // Value extracted in the line above is written to Rt 
+          break;
+
+        case 43: // 101011 sw
+          bitset<32> memoryAddress = bitset<32>(op1.to_ulong() + signExtImmediate.to_ulong());
+          myDataMem.MemoryAccess(memoryAddress, op2, 0, 1);                         // M[R[rs] + signExtImmediate] = R[rt]
+          break;
+
+        case 4: // 000100 beq
+          if (op1 ==  op2)
+          {
+            PC = (PC.to_ulong() + 4) + (signExtImmediate.to_ulong() << 2);
+            dontUpdatePC = true;
+          }
+          break;
+      
+        default:
+          break;
+
+      }
     }
     
-    PC = PC.to_ulong() + 4;                                                     // Update program counter by 4
+    if (!dontUpdatePC)
+    {
+      PC = PC.to_ulong() + 4;                                                         // Update program counter by 4
+    }
+    
 
     /**** You don't need to modify the following lines. ****/
     myRF.OutputRF(); // dump RF;    

@@ -17,7 +17,6 @@ using namespace std;
 // we keep it as this large number, but the memory is still 32-bit addressable.
 #define MemSize (65536)
 
-
 class RF
 {
   public:
@@ -86,33 +85,47 @@ class ALU
       // TODO: implement!
 
       int aluOpInt = ALUOP.to_ullong();
+      int addRes;
       // Carry out the operation based on ALUOp
       switch (aluOpInt)
       {
-        case ADDU:
-          int addRes = oprand1.to_ulong() + oprand2.to_ulong();
+        case ADDU: 
+        {
+          addRes = oprand1.to_ulong() + oprand2.to_ulong();
           ALUresult = bitset<32>(addRes);
           break;
+        }
+          
 
         case SUBU:
-          int addRes = oprand1.to_ulong() - oprand2.to_ulong();
+        {
+          addRes = oprand1.to_ulong() - oprand2.to_ulong();
           ALUresult = bitset<32>(addRes);
           break;
+        }
+          
 
-        case AND:
+        case AND: 
+        {
           ALUresult = oprand1 & oprand2;
           break;
-
+        }
+        
         case OR:
+        {
           ALUresult = oprand1 | oprand2;
           break;
-
+        }
+          
         case NOR:
+        {
           ALUresult = ~(oprand1 | oprand2);
           break;
+        }
+          
 
         default:
-          cout << "Instrcution not defined!";
+          cout << "Instruction not defined!";
           break;
       }
 
@@ -170,7 +183,6 @@ class INSMem
 
   private:
     vector<bitset<8> > IMem;
-
 };
 
 class DataMem    
@@ -276,7 +288,7 @@ int main()
     // Execute: after decoding, ALU may run and return result
     // Read/Write Mem: access data memory (myDataMem)
     // Write back to RF: some operations may write things to RF
-    // =================
+    // ================= END OF BOILERPLATE =========================================
 
     bitset<32> instruction = myInsMem.ReadMemory(PC);
     bitset<5> opcode = bitset<5>(instruction.to_string().substr(0, 6));
@@ -324,31 +336,39 @@ int main()
       switch (opcode.to_ulong())
       {
         case 9: // 001001 addiu
+        {
           myRF.ReadWrite(rsAddress, 0, 0, 0, 0);
           bitset<32> op1 = myRF.ReadData1;                                          // RS is the first operand for I Type
           myALU.ALUOperation(ADDU, op1, signExtImmediate);
           myRF.ReadWrite(rsAddress, 0, rtAddress, myALU.ALUresult, 1);              // Write as R[rt] <- R[rs] + signExtImm
           break;
-
+        }
+        
         case 35: // 100011 lw
+        {
           bitset<32> memoryAddress = bitset<32>(op1.to_ulong() + signExtImmediate.to_ulong());
           myDataMem.MemoryAccess(memoryAddress, 0, 1, 0);                           // M[R[rs] + signExtImmediate] 
           myRF.ReadWrite(0, 0, rtAddress, myDataMem.readdata, 1);                   // Value extracted in the line above is written to Rt 
           break;
-
+        }
+        
         case 43: // 101011 sw
+        {
           bitset<32> memoryAddress = bitset<32>(op1.to_ulong() + signExtImmediate.to_ulong());
           myDataMem.MemoryAccess(memoryAddress, op2, 0, 1);                         // M[R[rs] + signExtImmediate] = R[rt]
           break;
-
+        }
+        
         case 4: // 000100 beq
+        {
           if (op1 ==  op2)
           {
             PC = ((PC.to_ulong() + 4) & 0xf0000000) + (signExtImmediate.to_ulong() << 2);
             dontUpdatePC = true;
           }
           break;
-      
+        }
+
         default:
           break;
 

@@ -272,6 +272,12 @@ int main()
   while (1)  // TODO: implement!
   {
     // Fetch: fetch an instruction from myInsMem.
+    // decode(Read RF): get opcode and other signals from instruction, decode instruction
+    // Execute: after decoding, ALU may run and return result
+    // Read/Write Mem: access data memory (myDataMem)
+    // Write back to RF: some operations may write things to RF
+    // =================
+
     bitset<32> instruction = myInsMem.ReadMemory(PC);
     bitset<5> opcode = bitset<5>(instruction.to_string().substr(0, 6));
     bool dontUpdatePC = false; // Set to true for branches and jumps
@@ -279,14 +285,6 @@ int main()
     // If current instruction is "11111111111111111111111111111111", then break; (exit the while loop)
     if (instruction.all())
       break;
-
-    // decode(Read RF): get opcode and other signals from instruction, decode instruction
-
-    // Execute: after decoding, ALU may run and return result
-
-    // Read/Write Mem: access data memory (myDataMem)
-
-    // Write back to RF: some operations may write things to RF
 
     if (!opcode.any())                            // R Type
     {
@@ -305,7 +303,12 @@ int main()
     }
     else if (opcode == 00010 || opcode == 00011)  // J Type
     {
-      // (TODO: Statement Added by Ravi)
+      if (opcode == 00010)
+      {
+        bitset<26> jumpAddress = bitset<26>(instruction.to_string().substr(6, 26));
+        PC = (((PC.to_ulong() + 4) & 0xf0000000)) + (jumpAddress.to_ulong() << 2);
+        dontUpdatePC = true;
+      }
     }
     else if (opcode != 00010 && opcode != 00011)  // I Type <- not R and not J                                  
     {
@@ -341,7 +344,7 @@ int main()
         case 4: // 000100 beq
           if (op1 ==  op2)
           {
-            PC = (PC.to_ulong() + 4) + (signExtImmediate.to_ulong() << 2);
+            PC = ((PC.to_ulong() + 4) & 0xf0000000) + (signExtImmediate.to_ulong() << 2);
             dontUpdatePC = true;
           }
           break;

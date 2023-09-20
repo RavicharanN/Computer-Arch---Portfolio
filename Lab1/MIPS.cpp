@@ -90,12 +90,12 @@ class ALU
       switch (aluOpInt)
       {
         case ADDU:
-          uint addRes = oprand1.to_ulong() + oprand2.to_ulong();
+          int addRes = oprand1.to_ulong() + oprand2.to_ulong();
           ALUresult = bitset<32>(addRes);
           break;
 
         case SUBU:
-          uint addRes = oprand1.to_ulong() - oprand2.to_ulong();
+          int addRes = oprand1.to_ulong() - oprand2.to_ulong();
           ALUresult = bitset<32>(addRes);
           break;
 

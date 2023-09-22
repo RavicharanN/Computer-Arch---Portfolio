@@ -45,6 +45,7 @@ class RF
       // If write enable is set, writeData to the writeRegister
       if (WrtEnable.all())
       {
+        cout << "Writing " << WrtData << " to " << WrtReg.to_ulong() << endl;
         Registers[wrtRegIdx] = WrtData;
       }
     }
@@ -91,6 +92,7 @@ class ALU
       {
         case ADDU: 
         {
+          cout << "Add" << endl;
           addRes = oprand1.to_ulong() + oprand2.to_ulong();
           ALUresult = bitset<32>(addRes);
           break;
@@ -98,6 +100,7 @@ class ALU
 
         case SUBU:
         {
+          cout << "Sub" << endl;
           addRes = oprand1.to_ulong() - oprand2.to_ulong();
           ALUresult = bitset<32>(addRes);
           break;
@@ -105,18 +108,21 @@ class ALU
 
         case AND: 
         {
+          cout << "and" << endl;
           ALUresult = oprand1 & oprand2;
           break;
         }
         
         case OR:
         {
+          cout << "or" << endl;
           ALUresult = oprand1 | oprand2;
           break;
         }
           
         case NOR:
         {
+          cout << "nor" << endl;
           ALUresult = ~(oprand1 | oprand2);
           break;
         }
@@ -263,7 +269,18 @@ class DataMem
   private:
     vector<bitset<8> > DMem;
 
-};  
+};
+
+bitset<32> getSignExtendImmed(string immediate)
+{
+  char signBit = immediate[0];
+  if (signBit == '0')
+  {
+    return bitset<32>("0000000000000000" + immediate);
+  }
+
+  return bitset<32>("1111111111111111" + immediate);
+}
 
 int main()
 {
@@ -274,8 +291,6 @@ int main()
 
   bitset<32> PC;
   bitset<32> instruction = myInsMem.ReadMemory(PC);
-
-  int cnt = 0;
 
   while (1)  // TODO: implement!
   {
@@ -288,8 +303,6 @@ int main()
 
     bitset<32> instruction = myInsMem.ReadMemory(PC);
     bitset<6> opcode = bitset<6>(instruction.to_string().substr(0, 6));
-    bitset<6> opcode_five_bits = bitset<6>(instruction.to_string().substr(0, 6));
-    cout << opcode << endl;
     bool dontUpdatePC = false; // Set to true for branches and jumps
 
     // If current instruction is "11111111111111111111111111111111", then break; (exit the while loop)
@@ -298,18 +311,19 @@ int main()
 
     if (!opcode.any())                            // R Type
     {
+      cout << "R-Type " << endl;
       bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));   // op1 
       bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));  // op2
       bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(16, 5));  // rd <- rs + rt
       bitset<3> aluOp = bitset<3>(instruction.to_string().substr(29, 3));
 
-      myRF.ReadWrite(rsAddress, rtAddress, rdAddress, 0, 0);                    // Get the values at rs & rt for computation 
+      myRF.ReadWrite(rsAddress, rtAddress, 0, 0, 0);                    // Get the values at rs & rt for computation 
       bitset<32> reg1 = myRF.ReadData1;
-      bitset<32> reg2 = myRF.ReadData2;                                         // Feed these values to ALU
+      bitset<32> reg2 = myRF.ReadData2;                                 // Feed these values to ALU
       
       myALU.ALUOperation(aluOp, reg1, reg2);
       bitset<32> writeData = myALU.ALUresult;
-      myRF.ReadWrite(rsAddress, 0, rdAddress, writeData, 1);                    // Carry out the ALU operation and feed the res to RF
+      myRF.ReadWrite(0, 0, rdAddress, writeData, 1);                    // Carry out the ALU operation and feed the res to RF
     }
     else if (opcode == 0x02 || opcode == 0x03)  // J Type
     {
@@ -325,7 +339,7 @@ int main()
       bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));       // op1 
       bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));      // This becomes the write for I type
       bitset<16> immediate = bitset<16>(instruction.to_string().substr(16, 16));
-      bitset<32> signExtImmediate = bitset<32>(immediate.to_ulong() & 0xFFFFFFFF);  // Sign extend immediate is used as the second op for I Type
+      bitset<32> signExtendImmed =  getSignExtendImmed(immediate.to_string());      // Sign extend immediate is used as the second op for I Type
       
       myRF.ReadWrite(rsAddress, rtAddress, 0, 0, 0);
       bitset<32> op1 = myRF.ReadData1;                                              // op1 here is rs
@@ -337,16 +351,15 @@ int main()
         {
           myRF.ReadWrite(rsAddress, 0, 0, 0, 0);
           bitset<32> op1 = myRF.ReadData1;                                          // RS is the first operand for I Type
-          cout << op1 << " SignedExt imm " << signExtImmediate.to_ulong() << " " << immediate.to_ulong() << endl;
-          myALU.ALUOperation(ADDU, op1, signExtImmediate);
+          cout << op1 << " SignedExt imm " << signExtendImmed.to_ulong() << " " << immediate.to_ulong() << endl;
+          myALU.ALUOperation(ADDU, op1, signExtendImmed.to_ulong());
           myRF.ReadWrite(rsAddress, 0, rtAddress, myALU.ALUresult, 1);              // Write as R[rt] <- R[rs] + signExtImm
           break;
         }
         
         case 35: // 100011 lw
         {
-          bitset<32> memoryAddress = bitset<32>(op1.to_ulong() + signExtImmediate.to_ulong());
-          cout << "RT" << rtAddress << " " << op2 << " " << memoryAddress << endl;
+          bitset<32> memoryAddress = bitset<32>(op1.to_ulong() + signExtendImmed.to_ulong());
           myDataMem.MemoryAccess(memoryAddress, 0, 1, 0);                           // M[R[rs] + signExtImmediate] 
           myRF.ReadWrite(0, 0, rtAddress, myDataMem.readdata, 1);                   // Value extracted in the line above is written to Rt 
           break;
@@ -354,16 +367,16 @@ int main()
         
         case 43: // 101011 sw
         {
-          bitset<32> memoryAddress = bitset<32>(op1.to_ulong() + signExtImmediate.to_ulong());
+          bitset<32> memoryAddress = bitset<32>(op1.to_ulong() + signExtendImmed.to_ulong());
           myDataMem.MemoryAccess(memoryAddress, op2, 0, 1);                         // M[R[rs] + signExtImmediate] = R[rt]
           break;
         }
         
         case 4: // 000100 beq
         {
-          if (op1 ==  op2)
+          if (op1.to_ulong() ==  op2.to_ulong())
           {
-            PC = ((PC.to_ulong() + 4) & 0xf0000000) + (signExtImmediate.to_ulong() << 2);
+            PC = (PC.to_ulong() + 4) + (signExtendImmed.to_ulong() << 2);
             dontUpdatePC = true;
           }
           break;
@@ -380,7 +393,6 @@ int main()
       PC = PC.to_ulong() + 4;                                                         // Update program counter by 4
     }
     
-
     /**** You don't need to modify the following lines. ****/
     myRF.OutputRF(); // dump RF;    
   }

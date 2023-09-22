@@ -330,7 +330,12 @@ int main()
       if (opcode == 0x02)
       {
         bitset<26> jumpAddress = bitset<26>(instruction.to_string().substr(6, 26));
-        PC = (((PC.to_ulong() + 4) & 0xf0000000)) + (jumpAddress.to_ulong() << 2);
+        PC = PC.to_ulong() + 4;
+        PC = bitset<32>(
+          PC.to_string().substr(0, 4) + 
+          jumpAddress.to_string() +
+          "00");
+
         dontUpdatePC = true;
       }
     }

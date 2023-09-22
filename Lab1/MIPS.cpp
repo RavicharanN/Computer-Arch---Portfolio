@@ -144,9 +144,7 @@ class INSMem
       {
         while (getline(imem,line))
         {
-          line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
           IMem[i] = bitset<8>(line);
-          cout << i << " " << IMem[i] << endl;
           i++;
         }
       }
@@ -197,7 +195,6 @@ class DataMem
       {
         while (getline(dmem,line))
         {      
-          line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
           DMem[i] = bitset<8>(line);
           i++;
         }
@@ -290,8 +287,9 @@ int main()
     // ================= END OF BOILERPLATE =========================================
 
     bitset<32> instruction = myInsMem.ReadMemory(PC);
-    cout << instruction << endl;
     bitset<6> opcode = bitset<6>(instruction.to_string().substr(0, 6));
+    bitset<6> opcode_five_bits = bitset<6>(instruction.to_string().substr(0, 6));
+    cout << opcode << endl;
     bool dontUpdatePC = false; // Set to true for branches and jumps
 
     // If current instruction is "11111111111111111111111111111111", then break; (exit the while loop)
@@ -313,16 +311,16 @@ int main()
       bitset<32> writeData = myALU.ALUresult;
       myRF.ReadWrite(rsAddress, 0, rdAddress, writeData, 1);                    // Carry out the ALU operation and feed the res to RF
     }
-    else if (opcode == 000010 || opcode == 000011)  // J Type
+    else if (opcode == 0x02 || opcode == 0x03)  // J Type
     {
-      if (opcode == 000010)
+      if (opcode == 0x02)
       {
         bitset<26> jumpAddress = bitset<26>(instruction.to_string().substr(6, 26));
         PC = (((PC.to_ulong() + 4) & 0xf0000000)) + (jumpAddress.to_ulong() << 2);
         dontUpdatePC = true;
       }
     }
-    else if (opcode != 000010 && opcode != 000011)  // I Type <- not R and not J                                  
+    else  // I Type <- not R and not J                                  
     {
       bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));       // op1 
       bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));      // This becomes the write for I type
@@ -339,6 +337,7 @@ int main()
         {
           myRF.ReadWrite(rsAddress, 0, 0, 0, 0);
           bitset<32> op1 = myRF.ReadData1;                                          // RS is the first operand for I Type
+          cout << op1 << " SignedExt imm " << signExtImmediate.to_ulong() << " " << immediate.to_ulong() << endl;
           myALU.ALUOperation(ADDU, op1, signExtImmediate);
           myRF.ReadWrite(rsAddress, 0, rtAddress, myALU.ALUresult, 1);              // Write as R[rt] <- R[rs] + signExtImm
           break;

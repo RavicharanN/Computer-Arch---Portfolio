@@ -22,9 +22,9 @@ class RF
   public:
     bitset<32> ReadData1, ReadData2; 
     RF()
-    { 
+    {
       Registers.resize(32);  
-      Registers[0] = bitset<32> (0);  
+      Registers[0] = bitset<32> (0);
     }
 
     void ReadWrite(bitset<5> RdReg1, bitset<5> RdReg2, bitset<5> WrtReg, bitset<32> WrtData, bitset<1> WrtEnable)
@@ -76,7 +76,7 @@ class ALU
   public:
     bitset<32> ALUresult;
     bitset<32> ALUOperation (bitset<3> ALUOP, bitset<32> oprand1, bitset<32> oprand2)
-    {   
+    {
       /**
        * @brief Implement the ALU operation here.
        *
@@ -84,7 +84,7 @@ class ALU
        */
       // TODO: implement!
 
-      int aluOpInt = ALUOP.to_ullong();
+      int aluOpInt = ALUOP.to_ulong();
       int addRes;
       // Carry out the operation based on ALUOp
       switch (aluOpInt)
@@ -95,7 +95,6 @@ class ALU
           ALUresult = bitset<32>(addRes);
           break;
         }
-          
 
         case SUBU:
         {
@@ -103,7 +102,6 @@ class ALU
           ALUresult = bitset<32>(addRes);
           break;
         }
-          
 
         case AND: 
         {
@@ -122,10 +120,8 @@ class ALU
           ALUresult = ~(oprand1 | oprand2);
           break;
         }
-          
 
         default:
-          cout << "Instruction not defined!";
           break;
       }
 
@@ -142,16 +138,17 @@ class INSMem
     {       IMem.resize(MemSize); 
       ifstream imem;
       string line;
-      int i=0;
+      int i=0; 
       imem.open("imem.txt");
       if (imem.is_open())
       {
         while (getline(imem,line))
-        {      
+        {
+          line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
           IMem[i] = bitset<8>(line);
+          cout << i << " " << IMem[i] << endl;
           i++;
         }
-
       }
       else cout<<"Unable to open file";
       imem.close();
@@ -172,9 +169,9 @@ class INSMem
 
       // Concat the current 8 bits (at byteIdx) and the consecutive 26 bits (3 bytes) to get the instruction
       string bitsetInstStr = "";
-      for (int i = byteIdx; i < byteIdx + 3; i++)
+      for (int i = byteIdx; i <= byteIdx + 3; i++)
       {
-          bitsetInstStr += IMem[byteIdx].to_string();
+          bitsetInstStr += IMem[i].to_string();
       }
 
       Instruction = bitset<32>(bitsetInstStr);
@@ -200,6 +197,7 @@ class DataMem
       {
         while (getline(dmem,line))
         {      
+          line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
           DMem[i] = bitset<8>(line);
           i++;
         }
@@ -224,9 +222,9 @@ class DataMem
       if (readmem.any())
       {
         string bitsetInstStr = "";
-        for (int i = addIdx; i < addIdx + 3; i++)
+        for (int i = addIdx; i <= addIdx + 3; i++)
         {
-            bitsetInstStr += DMem[addIdx + i].to_string();
+            bitsetInstStr += DMem[i].to_string();
         }
 
         return readdata = bitset<32>(bitsetInstStr);
@@ -270,8 +268,6 @@ class DataMem
 
 };  
 
-
-
 int main()
 {
   RF myRF;
@@ -280,6 +276,9 @@ int main()
   DataMem myDataMem;
 
   bitset<32> PC;
+  bitset<32> instruction = myInsMem.ReadMemory(PC);
+
+  int cnt = 0;
 
   while (1)  // TODO: implement!
   {
@@ -291,7 +290,8 @@ int main()
     // ================= END OF BOILERPLATE =========================================
 
     bitset<32> instruction = myInsMem.ReadMemory(PC);
-    bitset<5> opcode = bitset<5>(instruction.to_string().substr(0, 6));
+    cout << instruction << endl;
+    bitset<6> opcode = bitset<6>(instruction.to_string().substr(0, 6));
     bool dontUpdatePC = false; // Set to true for branches and jumps
 
     // If current instruction is "11111111111111111111111111111111", then break; (exit the while loop)
@@ -313,23 +313,23 @@ int main()
       bitset<32> writeData = myALU.ALUresult;
       myRF.ReadWrite(rsAddress, 0, rdAddress, writeData, 1);                    // Carry out the ALU operation and feed the res to RF
     }
-    else if (opcode == 00010 || opcode == 00011)  // J Type
+    else if (opcode == 000010 || opcode == 000011)  // J Type
     {
-      if (opcode == 00010)
+      if (opcode == 000010)
       {
         bitset<26> jumpAddress = bitset<26>(instruction.to_string().substr(6, 26));
         PC = (((PC.to_ulong() + 4) & 0xf0000000)) + (jumpAddress.to_ulong() << 2);
         dontUpdatePC = true;
       }
     }
-    else if (opcode != 00010 && opcode != 00011)  // I Type <- not R and not J                                  
+    else if (opcode != 000010 && opcode != 000011)  // I Type <- not R and not J                                  
     {
       bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));       // op1 
       bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));      // This becomes the write for I type
       bitset<16> immediate = bitset<16>(instruction.to_string().substr(16, 16));
       bitset<32> signExtImmediate = bitset<32>(immediate.to_ulong() & 0xFFFFFFFF);  // Sign extend immediate is used as the second op for I Type
       
-      myRF.ReadWrite(rsAddress, 0, rtAddress, 0, 0);
+      myRF.ReadWrite(rsAddress, rtAddress, 0, 0, 0);
       bitset<32> op1 = myRF.ReadData1;                                              // op1 here is rs
       bitset<32> op2 = myRF.ReadData2;
 
@@ -347,6 +347,7 @@ int main()
         case 35: // 100011 lw
         {
           bitset<32> memoryAddress = bitset<32>(op1.to_ulong() + signExtImmediate.to_ulong());
+          cout << "RT" << rtAddress << " " << op2 << " " << memoryAddress << endl;
           myDataMem.MemoryAccess(memoryAddress, 0, 1, 0);                           // M[R[rs] + signExtImmediate] 
           myRF.ReadWrite(0, 0, rtAddress, myDataMem.readdata, 1);                   // Value extracted in the line above is written to Rt 
           break;

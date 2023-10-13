@@ -332,8 +332,7 @@ bitset<32> getSignExtendImmed(string immediate)
  
 
 int main()
-{
-    
+{   
     RF myRF;
     INSMem myInsMem;
     DataMem myDataMem;
@@ -347,72 +346,76 @@ int main()
        
         // R Type : ADDU, SUBU
         // I Type : LW WS BNE
-        bitset<32> instruction = myInsMem.readInstr(PC);
-        bitset<5> opcode = (instruction.to_string()).substr(0, 5);
-        bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));   // op1 
-        bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));  // op2
-        bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(16, 5));  // rd <- rs + rt
-        bitset<3> aluOp = bitset<3>(instruction.to_string().substr(29, 3));
 
-        bitset<32> rsVal = myRF.readRF(rsAddress);                  
-        bitset<32> rtVal = myRF.readRF(rtAddress);                          // Get the values at rs & rt for computation 
+        // ---------------- OLD CODE only for ref -----------------------------------------------
+        // bitset<32> instruction = myInsMem.readInstr(PC);
+        // bitset<5> opcode = (instruction.to_string()).substr(0, 5);
+        // bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));   // op1 
+        // bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));  // op2
+        // bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(16, 5));  // rd <- rs + rt
+        // bitset<3> aluOp = bitset<3>(instruction.to_string().substr(29, 3));
 
-        if (instruction.all())              // HALT 
-            break;
+        // bitset<32> rsVal = myRF.readRF(rsAddress);                  
+        // bitset<32> rtVal = myRF.readRF(rtAddress);                          // Get the values at rs & rt for computation 
+
+        // if (instruction.all())              // HALT 
+        //     break;
     
-        if (!opcode.any())                  // R Type
-        {
-            cout << "R-Type " << endl;
+        // if (!opcode.any())                  // R Type
+        // {
+        //     cout << "R-Type " << endl;
 
-            bitset<32> writeData = myALU.ALUOperation(aluOp, rsVal, rsVal);
-            myRF.writeRF(rdAddress, writeData);                                 // Carry out the ALU operation and feed the res to RF                  
-        }
-        else    // I Type
-        {
-            bitset<16> immediate = bitset<16>(instruction.to_string().substr(16, 16));
-            bitset<32> signExtendImmed =  getSignExtendImmed(immediate.to_string());      // Sign extend immediate is used as the second op for I Type
+        //     bitset<32> writeData = myALU.ALUOperation(aluOp, rsVal, rsVal);
+        //     myRF.writeRF(rdAddress, writeData);                                 // Carry out the ALU operation and feed the res to RF                  
+        // }
+        // else    // I Type
+        // {
+        //     bitset<16> immediate = bitset<16>(instruction.to_string().substr(16, 16));
+        //     bitset<32> signExtendImmed =  getSignExtendImmed(immediate.to_string());      // Sign extend immediate is used as the second op for I Type
             
-            // I type
-            switch (opcode.to_ulong())
-            {   
-                case 35: // 100011 lw
-                {
-                    bitset<32> memoryAddress = bitset<32>(rsVal.to_ulong() + signExtendImmed.to_ulong());
-                    bitset<32> writeVal = myDataMem.readDataMem(memoryAddress);
-                    myDataMem.writeDataMem(rtVal, writeVal);
-                    break;
-                }
+        //     // I type
+        //     switch (opcode.to_ulong())
+        //     {   
+        //         case 35: // 100011 lw
+        //         {
+        //             bitset<32> memoryAddress = bitset<32>(rsVal.to_ulong() + signExtendImmed.to_ulong());
+        //             bitset<32> writeVal = myDataMem.readDataMem(memoryAddress);
+        //             myDataMem.writeDataMem(rtVal, writeVal);
+        //             break;
+        //         }
                 
-                case 43: // 101011 sw
-                {
-                    bitset<32> memoryAddress = bitset<32>(rsVal.to_ulong() + signExtendImmed.to_ulong());
-                    myDataMem.writeDataMem(memoryAddress, rtVal);                        // M[R[rs] + signExtImmediate] = R[rt]
-                    break;
-                }
+        //         case 43: // 101011 sw
+        //         {
+        //             bitset<32> memoryAddress = bitset<32>(rsVal.to_ulong() + signExtendImmed.to_ulong());
+        //             myDataMem.writeDataMem(memoryAddress, rtVal);                        // M[R[rs] + signExtImmediate] = R[rt]
+        //             break;
+        //         }
 
-                // TODO: Case BNE
-                default:
-                    break;
-            }
-        }
+        //         // TODO: Case BNE
+        //         default:
+        //             break;
+        //     }
+        // }
 
         /* --------------------- WB stage --------------------- */
-
-
+        if (!state.WB.nop)
+        {
+            if (state.WB.wrt_enable)   // LW instruction is written back here to RF
+                myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
+        }
 
         /* --------------------- MEM stage --------------------- */
         if (!state.MEM.nop)
         {
-            state.WB.nop = false;
             nextState.WB.Wrt_data = state.MEM.ALUresult;
-            
+
             if (state.MEM.wrt_mem) // sw, no need to update write_data
             {
-                // Handle MEM - MEM forwarding
-                if (state.MEM.Rt == state.MEM.Wrt_reg_addr && state.WB.wrt_enable)
-                    myDataMem.writeDataMem(state.MEM.ALUresult, state.WB.Wrt_data);
-                else
-                    myDataMem.writeDataMem(state.MEM.ALUresult, state.MEM.ALUresult);
+                // Handle MEM - MEM forwarding (CHECK THIS)
+                if (!state.WB.nop && (state.MEM.Rt == state.WB.Wrt_reg_addr) && state.WB.wrt_enable)
+                    state.MEM.Store_data = state.WB.Wrt_data;
+
+                myDataMem.writeDataMem(state.MEM.ALUresult, state.MEM.Store_data);
             }
             else if (state.MEM.rd_mem)
                 nextState.WB.Wrt_data = myDataMem.readDataMem(state.MEM.ALUresult);
@@ -422,11 +425,7 @@ int main()
             nextState.WB.Wrt_reg_addr = state.MEM.Wrt_reg_addr;
             nextState.WB.wrt_enable = state.MEM.wrt_enable;
         }
-        else
-        {
-            state.WB.nop = true;
-        }
-
+        nextState.WB.nop = state.MEM.nop;
 
         /* --------------------- EX stage --------------------- */
         if (!state.EX.nop)
@@ -435,6 +434,8 @@ int main()
             bitset<32> op1 = state.EX.Read_data1;
             bitset<32> op2 = (state.EX.is_I_type ? getSignExtendImmed(state.EX.Imm.to_string()) : state.EX.Read_data2);
             // NOTE: (In the ABOVE LINE) : Both lw and sw use (rs + signExtImm) as inputs, so use that as op2
+
+            nextState.MEM.Store_data = state.EX.Read_data2;         // Only relevant for sw
 
             // Handle EX EX forwarding
             if (state.MEM.wrt_enable)    // if register file gets upadted, handle this in the first half; 
@@ -448,7 +449,7 @@ int main()
             }
 
             // Handle MEM - EX forwarding
-            if (state.WB.wrt_enable)
+            if (state.WB.wrt_enable)  // (CHECK THIS - Handle tests) 
             {
                 if (state.EX.Rs == state.WB.Wrt_reg_addr)
                     op1 = state.WB.Wrt_data;
@@ -467,20 +468,14 @@ int main()
                 nextState.MEM.Store_data = state.WB.Wrt_data;
 
             // All these flags set in EX will be carried forward
-            nextState.MEM.Store_data = state.EX.Read_data2;         // Only relevant for sw
             nextState.MEM.Rs = state.EX.Rs;
             nextState.MEM.Rt = state.EX.Rt;
             nextState.MEM.Wrt_reg_addr = state.EX.Wrt_reg_addr;
             nextState.MEM.wrt_enable = state.EX.wrt_enable;
             nextState.MEM.rd_mem = state.EX.rd_mem;
             nextState.MEM.wrt_mem = state.EX.wrt_mem;
-            nextState.MEM.nop = false;
         }
-        else
-        {
-            nextState.MEM.nop = true;
-        }
-     
+        nextState.MEM.nop = state.EX.nop;
           
         /* --------------------- ID stage --------------------- */
         if (!state.ID.nop)
@@ -507,7 +502,7 @@ int main()
             nextState.EX.rd_mem = (opcode.to_ulong() == 35);
             nextState.EX.wrt_mem = (opcode.to_ulong() == 43);
 
-            if (!opcode.any())  // R Type
+            if (!opcode.any())  // R Type 
             {
                 nextState.EX.Wrt_reg_addr = rdAddress;
                 nextState.EX.wrt_enable = true;
@@ -523,27 +518,34 @@ int main()
                 }
                 // TODO : SW and BEQ
             }
-            // TODO :  HANDLE STALLSSSSSS -------------
 
-            nextState.EX.nop = false;
+            // TODO :  HANDLE STALLSSSSSS -------------
+            if (!state.EX.nop && state.EX.wrt_enable)
+            {
+                if ((state.EX.Wrt_reg_addr == rsAddress) || (rtAddress == state.WB.Wrt_reg_addr && !state.EX.is_I_type))
+                {
+                    nextState.IF = state.IF;
+                    nextState.ID = state.ID;
+                    nextState.EX.nop = true;
+                }
+            }
         }
-        else
-        {
-            nextState.EX.nop = true;
-        }
+        nextState.EX.nop = state.ID.nop;
         
         /* --------------------- IF stage --------------------- */
         if (!state.IF.nop)
         {
             nextState.ID.Instr = myInsMem.readInstr(PC);
             nextState.IF.PC = PC.to_ullong() + 4;
+            nextState.ID.nop = false;
 
-            nextState.ID.nop = true;
+            if (nextState.ID.Instr.all()) // Halt instructions - (CHECK THIS)
+                nextState.ID.nop = true;
         }
         else
-        {
-            nextState.EX.nop = true;
-        }
+            nextState.ID.nop = true;
+
+        /* ------------------- END OF IF stage ------------------*/
              
         if (state.IF.nop && state.ID.nop && state.EX.nop && state.MEM.nop && state.WB.nop)
             break;

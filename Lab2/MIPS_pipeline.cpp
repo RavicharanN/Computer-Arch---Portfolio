@@ -15,12 +15,14 @@ using namespace std;
 
 struct IFStruct {
     bitset<32>  PC;
-    bool        nop;  
+    bool        nop;
+    IFStruct() : PC(0), nop(0) {} 
 };
 
 struct IDStruct {
     bitset<32>  Instr;
     bool        nop;  
+    IDStruct() : Instr(0), nop(1) {}
 };
 
 struct EXStruct {
@@ -35,7 +37,8 @@ struct EXStruct {
     bool        wrt_mem; 
     bool        alu_op;     //1 for addu, lw, sw, 0 for subu 
     bool        wrt_enable;
-    bool        nop;  
+    bool        nop;
+    EXStruct() : Read_data1(0), Read_data2(0), Imm(0), Rs(0), Rt(0), Wrt_reg_addr(0), is_I_type(0), rd_mem(0), alu_op(0), wrt_enable(0), nop(1) {}
 };
 
 struct MEMStruct {
@@ -48,6 +51,7 @@ struct MEMStruct {
     bool        wrt_mem; 
     bool        wrt_enable;    
     bool        nop;    
+    MEMStruct() : ALUresult(0), Store_data(0), Rs(0), Rt(0), Wrt_reg_addr(0), rd_mem(0), wrt_mem(0), wrt_enable(0), nop(1) {}
 };
 
 struct WBStruct {
@@ -56,7 +60,8 @@ struct WBStruct {
     bitset<5>   Rt;     
     bitset<5>   Wrt_reg_addr;
     bool        wrt_enable;
-    bool        nop;     
+    bool        nop;  
+    WBStruct() : Wrt_data(0), Rs(0), Rt(0), Wrt_reg_addr(0), wrt_enable(0), nop(1) {}   
 };
 
 struct stateStruct {
@@ -362,8 +367,13 @@ int main()
         }
 
         /* --------------------- MEM stage --------------------- */
+        if (state.MEM.nop)
+        {
+            nextState.WB.nop = true;
+        }
         if (!state.MEM.nop)
         {
+            nextState.WB.nop = false;
             cout << cycle << "MEM";
             nextState.WB.Wrt_data = state.MEM.ALUresult;
 
@@ -383,11 +393,15 @@ int main()
             nextState.WB.Wrt_reg_addr = state.MEM.Wrt_reg_addr;
             nextState.WB.wrt_enable = state.MEM.wrt_enable;
         }
-        nextState.WB.nop = state.MEM.nop;
 
         /* --------------------- EX stage --------------------- */
+        if (state.EX.nop)
+        {
+            nextState.MEM.nop = true;
+        }
         if (!state.EX.nop)
         {
+            nextState.MEM.nop = false;
             cout << cycle << "EX";
             // We only make use the ALU operand vals from the decode step and forward the result to mem 
             bitset<32> op1 = state.EX.Read_data1;
@@ -434,18 +448,22 @@ int main()
             nextState.MEM.rd_mem = state.EX.rd_mem;
             nextState.MEM.wrt_mem = state.EX.wrt_mem;
         }
-        nextState.MEM.nop = state.EX.nop;
           
         /* --------------------- ID stage --------------------- */
-        if (!state.ID.nop)
+        if (state.ID.nop)
         {
-            cout << cycle << "ID";
+            nextState.EX.nop = true;
+        }
+        else
+        {
+            nextState.EX.nop = false;
+            // cout << cycle << "ID";
             bitset<32> instruction = state.ID.Instr;
-            bitset<5> opcode = bitset<5>((instruction.to_string().substr(0, 5)));
+            bitset<6> opcode = bitset<6>((instruction.to_string().substr(0, 6)));
             bitset<5> rsAddress  = bitset<5>(instruction.to_string().substr(6, 5));   // op1 
             bitset<5> rtAddress  = bitset<5>(instruction.to_string().substr(11, 5));  // op2
             bitset<5> rdAddress  = bitset<5>(instruction.to_string().substr(16, 5));  // rd <- rs + rt
-            bitset<3> aluOp = bitset<3>(instruction.to_string().substr(29, 3));
+            bitset<6> aluOp = bitset<6>(instruction.to_string().substr(26, 6));
             bitset<16> imm = bitset<16>((instruction.to_string().substr(16, 16)));
 
             // Block to valeus for the EX stage.
@@ -457,20 +475,39 @@ int main()
 
             // if (!opcode.any()) :  R-Type 
             // else : Itype set to truwe
-            nextState.EX.is_I_type = opcode.any() && !instruction.all(); // Is I type if its not R type or J Type
-            nextState.EX.alu_op = aluOp.to_ulong() == 3 ? 0 : 1; //  If aluop is 3 (SUBU) then val is 0, 1 for the rest
-            // nextState.EX.rd_mem = (opcode.to_ulong() == 35);
-            // nextState.EX.wrt_mem = (opcode.to_ulong() == 43);
+            nextState.EX.is_I_type = opcode != 0 && opcode != 2; // Is I type if its not R type or J Type
+            nextState.EX.alu_op = 1; //  If aluop is 3 (SUBU) then val is 0, 1 for the rest
+            nextState.EX.rd_mem = (opcode.to_ulong() == 35);
+            nextState.EX.wrt_mem = (opcode.to_ulong() == 43);
+            nextState.EX.wrt_enable = false;
 
-            if (!opcode.any())  // R Type 
+            // =======
+            if (nextState.EX.is_I_type)  // I Type 
+            {
+                bitset<16> immediate = bitset<16>(instruction.to_string().substr(16, 16));
+                bitset<32> signExtendImmed =  getSignExtendImmed(immediate.to_string());
+                nextState.EX.Imm = immediate;
+                nextState.EX.Wrt_reg_addr = nextState.EX.Rt; // Rt
+                if (opcode == 0x23)                          // lw,
+                    nextState.EX.wrt_enable = true;
+                if (opcode == 0x04) // beq in this lab, treat it as bne
+                    if (nextState.EX.Read_data2 != nextState.EX.Read_data1)
+                    {
+                        isBranch = true;
+                        bitset<32> newBranchAdd = PC.to_ulong() + 4; 
+                        branchAddress = newBranchAdd.to_ulong() + (signExtendImmed.to_ulong() << 2);
+                        // remove + 4 is very important
+                        // bitset<32> signext = getSignExtendImmed(nextState.EX.Imm.to_string());
+                        // branchAddress = bitset<32>(
+                        //     state.IF.PC.to_ulong() + (bitset<32>((bitset<30>(shiftbits(signext, 0))).to_string<char, std::string::traits_type, std::string::allocator_type>() + "00")).to_ulong());
+                    }
+            }
+            else                // R Type
             {
                 nextState.EX.Wrt_reg_addr = rdAddress;
+                nextState.EX.alu_op = aluOp == 0x23 ? 0 : 1;
                 nextState.EX.wrt_enable = true;
-            }
-            else                // I Type
-            {
-                // bitset<16> immediate = bitset<16>(instruction.to_string().substr(16, 16));
-                // bitset<32> signExtendImmed =  getSignExtendImmed(immediate.to_string());
+                
 
                 // if (opcode.to_ulong() == 35) // LW
                 // {
@@ -498,26 +535,16 @@ int main()
                 //         nextState.EX.nop = true;
                 //     }
                 // }
-                nextState.EX.Imm = bitset<16>((state.ID.Instr).to_ulong() & 0xffff);
-                nextState.EX.Wrt_reg_addr = nextState.EX.Rt; // Rt
-                if (opcode == 0x23)                        // lw,
-                    nextState.EX.wrt_enable = true;
-                if (opcode == 0x04) // beq in this lab, treat it as bne
-                    if (nextState.EX.Read_data2 != nextState.EX.Read_data1)
-                    {
-                        isBranch = true;
-                        // remove + 4 is very important
-                        bitset<32> signext = getSignExtendImmed(nextState.EX.Imm.to_string());
-                        branchAddress = bitset<32>(
-                            state.IF.PC.to_ulong() + (bitset<32>((bitset<30>(shiftbits(signext, 0))).to_string<char, std::string::traits_type, std::string::allocator_type>() + "00")).to_ulong());
-                    }
+                
             }
+            // NOT MY CODE
             if (state.EX.wrt_enable) // check if stall is needed
             {
                 // when lw, sw, rt is to be forwarded; when r type, rs, rt both to be checked
                 if (!state.EX.nop && (state.EX.Wrt_reg_addr == nextState.EX.Rs || (!nextState.EX.is_I_type && state.EX.Wrt_reg_addr == nextState.EX.Rt)))
                     isStall = true;
             }
+            // NOTE MY CODE
 
             // TODO :  HANDLE STALLSSSSSS -------------
             // if (!state.EX.nop && state.EX.wrt_enable)
@@ -531,34 +558,35 @@ int main()
             //     }
             // }
         }
-        nextState.EX.nop = state.ID.nop;
         
         /* --------------------- IF stage --------------------- */
-        if (!state.IF.nop)
-        {
-             cout << cycle << "IF";
-                nextState.ID.nop = false;
-             nextState.ID.Instr = myInsMem.readInstr(state.IF.PC);
-             nextState.IF.PC = state.IF.PC.to_ullong() + 4;
-             
-        }
-        else
-            nextState.ID.nop = true;
-        
         // if (!state.IF.nop)
         // {
+        //     cout << cycle << "IF";
         //     nextState.ID.nop = false;
         //     nextState.ID.Instr = myInsMem.readInstr(state.IF.PC);
-        //     nextState.IF.PC = state.IF.PC.to_ulong() + 4;
+        //     nextState.IF.PC = state.IF.PC.to_ullong() + 4;
+             
         // }
         // else
-        // {
         //     nextState.ID.nop = true;
-        // }
+        
+        // -------- NOT MY CODE ----- 
+        if (state.IF.nop)
+        {
+            nextState.ID.nop = true;
+        }
+        else
+        {
+            nextState.ID.nop = false;
+            nextState.ID.Instr = myInsMem.readInstr(state.IF.PC);
+            nextState.IF.PC = state.IF.PC.to_ulong() + 4;
+        }
+        // ------- NOT MY CODE -----
         
         if (isBranch)
         {
-            // cout << "Branch from " << state.IF.PC.to_ulong() << " to " << branchAddress.to_ulong() << endl;
+            cout << "Branch from " << state.IF.PC.to_ulong() << " to " << branchAddress.to_ulong() << endl;
             isBranch = false;
             nextState.IF.PC = branchAddress;
             nextState.ID = state.ID;
@@ -566,14 +594,16 @@ int main()
             nextState.EX.nop = true;
         }
 
+        // ----- NOT MY CODE
         if (isStall)
         {
-            // cout << "Stalled" << endl;
+            cout << "Stalled" << endl;
             isStall = false;
             nextState.IF = state.IF;
             nextState.ID = state.ID;
             nextState.EX.nop = true;
         }
+        // ----- NOT MY CODE
         
         if (nextState.ID.Instr.all())
         {

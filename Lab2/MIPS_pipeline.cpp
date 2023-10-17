@@ -434,10 +434,6 @@ int main()
             }
 
             nextState.MEM.ALUresult = myALU.ALUOperation(state.EX.alu_op ? ADDU : SUBU, op1, op2);
-            // if (state.EX.alu_op)
-            //     nextState.MEM.ALUresult = op1.to_ulong() + op2.to_ulong();
-            // else 
-            //     nextState.MEM.ALUresult = op1.to_ulong() - op2.to_ulong();
 
             //  Directly forward to mem
             if (state.EX.wrt_mem && state.EX.Rt == state.WB.Wrt_reg_addr)

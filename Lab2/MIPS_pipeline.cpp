@@ -354,7 +354,7 @@ int main()
         /* --------------------- WB stage --------------------- */
         if (!state.WB.nop)
         {
-            cout << cycle << "IF" << endl;
+            cout << cycle << "WB" << endl;
             if (state.WB.wrt_enable)   // LW instruction is written back here to RF
                 myRF.writeRF(state.WB.Wrt_reg_addr, state.WB.Wrt_data);
         }
@@ -367,7 +367,17 @@ int main()
         if (!state.MEM.nop)
         {
             nextState.WB.nop = false;
-            cout << cycle << "MEM" << endl;
+            cout << " ============= MEM========================" << endl;
+            cout << "Cycle: " << cycle << endl;
+            cout << "ALUresult: " << state.MEM.ALUresult << endl;
+            cout << "Store_data:" << state.MEM.Store_data << endl;
+            cout << "Rs: " << state.MEM.Rs << endl;
+            cout << "Rt: " << state.MEM.Rt << endl;
+            cout << "Wrt_reg_addr: " << state.MEM.Wrt_reg_addr << endl;
+            cout << "rd_mem: " << state.MEM.rd_mem << endl;
+            cout << "wrt_mem: " << state.MEM.wrt_mem << endl;
+            cout << "wrt_enable: " << state.MEM.wrt_enable << endl;
+
             nextState.WB.Wrt_data = state.MEM.ALUresult;
 
             if (state.MEM.wrt_mem) // sw, no need to update write_data
@@ -395,7 +405,6 @@ int main()
         if (!state.EX.nop)
         {
             nextState.MEM.nop = false;
-            cout << cycle << "EX" << endl;
             // We only make use the ALU operand vals from the decode step and forward the result to mem 
             bitset<32> op1 = state.EX.Read_data1;
             bitset<32> op2 = (state.EX.is_I_type ? getSignExtendImmed(state.EX.Imm.to_string()) : state.EX.Read_data2);
@@ -424,10 +433,11 @@ int main()
                     op2 = state.WB.Wrt_data;
             }
 
-            if (state.EX.alu_op)
-                nextState.MEM.ALUresult = op1.to_ulong() + op2.to_ulong();
-            else 
-                nextState.MEM.ALUresult = op1.to_ulong() - op2.to_ulong();
+            nextState.MEM.ALUresult = myALU.ALUOperation(state.EX.alu_op ? ADDU : SUBU, op1, op2);
+            // if (state.EX.alu_op)
+            //     nextState.MEM.ALUresult = op1.to_ulong() + op2.to_ulong();
+            // else 
+            //     nextState.MEM.ALUresult = op1.to_ulong() - op2.to_ulong();
 
             //  Directly forward to mem
             if (state.EX.wrt_mem && state.EX.Rt == state.WB.Wrt_reg_addr)

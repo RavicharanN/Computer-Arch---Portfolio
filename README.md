@@ -1,7 +1,8 @@
 # CSA-Lab
 A bunch of simulators I implemented as a part of my Computer Architecture coursework
 
-Instructor: Brandon Raegan
+
+**Instructor:** Brandon Raegan
 
 ## Simulators list 
 * Single Cycle MIPS Simulator

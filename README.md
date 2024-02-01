@@ -1,8 +1,11 @@
 # CSA-Lab
 A bunch of simulators I implemented as a part of my Computer Architecture coursework
 
-**Course Code:** EC-GY 6913
+
 **Instructor:** Brandon Raegan
+
+**Course Code:** EC-GY 6913
+
 
 ## Simulators list 
 * Single Cycle MIPS Simulator
